@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Carte Grise OCR — Demo</title>
+  <style>
+    :root {
+      --be-black:  #000;
+      --be-yellow: #F6D02F;
+      --be-red:    #E41D2C;
+      --eu-blue:   #003399;
+      --eu-gold:   #FFD700;
+      --bg:        #ECEEF2;
+      --surface:   #fff;
+      --shadow:    0 4px 24px rgba(0,0,0,.10);
+      --radius:    14px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: #1a1a1a; min-height: 100vh; }
+
+    /* ── Setup banner ── */
+    .setup-banner {
+      background: #1a1a2e;
+      color: #e0e0e0;
+      font-size: .82rem;
+      padding: 10px 24px;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+    .setup-banner strong { color: var(--be-yellow); }
+    .setup-banner code {
+      background: rgba(255,255,255,.1);
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: .8rem;
+      color: #ccc;
+    }
+    .setup-banner .sep { color: #444; }
+    .docs-link {
+      color: var(--be-yellow);
+      text-decoration: none;
+      font-size: .8rem;
+    }
+    .docs-link:hover { text-decoration: underline; }
+
+    /* ── Header ── */
+    .flag-bar { height: 7px; background: linear-gradient(to right, var(--be-black) 33.33%, var(--be-yellow) 33.33% 66.66%, var(--be-red) 66.66%); }
+    header { background: var(--be-black); color: #fff; padding: 20px 40px; display: flex; align-items: center; gap: 18px; }
+    .mini-flag { display: flex; width: 40px; height: 26px; border-radius: 3px; overflow: hidden; border: 1px solid rgba(255,255,255,.15); flex-shrink: 0; }
+    .mini-flag div { flex: 1; }
+    .mf-b { background: #000; } .mf-y { background: var(--be-yellow); } .mf-r { background: var(--be-red); }
+    header h1 { font-size: 1.45rem; font-weight: 800; letter-spacing: -.5px; }
+    header p  { font-size: .8rem; color: #888; margin-top: 2px; }
+    .header-badge {
+      margin-left: auto;
+      background: rgba(246,208,47,.15);
+      border: 1px solid rgba(246,208,47,.3);
+      color: var(--be-yellow);
+      font-size: .7rem;
+      font-weight: 700;
+      padding: 4px 12px;
+      border-radius: 20px;
+      letter-spacing: .5px;
+      text-transform: uppercase;
+    }
+
+    /* ── Config panel ── */
+    .config-panel {
+      max-width: 900px;
+      margin: 24px auto 0;
+      padding: 0 20px;
+    }
+    .config-card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .config-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      cursor: pointer;
+      user-select: none;
+      border: none;
+      width: 100%;
+      background: none;
+      font: inherit;
+    }
+    .config-toggle:hover { background: #fafafa; }
+    .config-toggle span { font-size: .82rem; color: #666; }
+    .config-toggle strong { font-size: .88rem; }
+    .config-body {
+      display: none;
+      padding: 0 20px 16px;
+      border-top: 1px solid #f0f0f0;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px 24px;
+    }
+    .config-body.open { display: grid; }
+    .config-row { display: flex; flex-direction: column; gap: 4px; }
+    .config-row label { font-size: .72rem; text-transform: uppercase; letter-spacing: .5px; color: #999; font-weight: 700; }
+    .config-row input {
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: .88rem;
+      font-family: monospace;
+      outline: none;
+    }
+    .config-row input:focus { border-color: var(--be-yellow); }
+
+    /* ── Status dots ── */
+    .status-row {
+      display: flex;
+      gap: 16px;
+      padding: 12px 20px 0;
+      flex-wrap: wrap;
+    }
+    .status-item { display: flex; align-items: center; gap: 6px; font-size: .78rem; color: #666; }
+    .dot-status {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #ddd;
+      flex-shrink: 0;
+      transition: background .3s;
+    }
+    .dot-status.up   { background: #27ae60; }
+    .dot-status.down { background: var(--be-red); }
+    .dot-status.checking { background: var(--be-yellow); animation: pulse .8s infinite; }
+    @keyframes pulse { 50% { opacity: .3; } }
+
+    /* ── Main ── */
+    main { max-width: 900px; margin: 20px auto; padding: 0 20px; }
+
+    /* ── Upload ── */
+    .card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 32px; }
+    #upload-zone {
+      border: 2.5px dashed #D0D3DA;
+      border-radius: var(--radius);
+      padding: 52px 32px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+    }
+    #upload-zone:hover, #upload-zone.drag-over { border-color: var(--be-yellow); background: #FFFBEA; }
+    #upload-zone svg { color: #ccc; }
+    #upload-zone h2  { font-size: 1.1rem; color: #333; margin: 12px 0 5px; }
+    #upload-zone p   { font-size: .82rem; color: #aaa; }
+    #file-input { display: none; }
+
+    /* ── Preview ── */
+    #preview-section { display: none; }
+    #preview-section .inner { display: flex; flex-direction: column; align-items: center; gap: 18px; }
+    #preview-img { max-width: 100%; max-height: 300px; object-fit: contain; border-radius: 10px; border: 1px solid #eee; }
+    .btn-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+    .btn { padding: 12px 28px; border: none; border-radius: 8px; font-size: .9rem; font-weight: 700; cursor: pointer; transition: transform .15s, background .15s; }
+    .btn:hover { transform: translateY(-1px); }
+    .btn-primary { background: var(--be-yellow); color: var(--be-black); }
+    .btn-primary:hover { background: #e6be00; }
+    .btn-ghost { background: #ECEEF2; color: #555; }
+    .btn-ghost:hover { background: #dde0e6; }
+
+    /* ── Loading ── */
+    #loading-section { display: none; text-align: center; padding: 44px 32px; }
+    .spinner { width: 48px; height: 48px; border: 5px solid #eee; border-top-color: var(--be-yellow); border-radius: 50%; animation: spin .75s linear infinite; margin: 0 auto 24px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .steps { display: inline-flex; flex-direction: column; gap: 10px; text-align: left; }
+    .step  { display: flex; align-items: center; gap: 12px; font-size: .88rem; color: #ccc; }
+    .step .dot { width: 22px; height: 22px; border-radius: 50%; background: #eee; display: flex; align-items: center; justify-content: center; font-size: .7rem; flex-shrink: 0; transition: background .2s; }
+    .step.active { color: #222; font-weight: 600; }
+    .step.active .dot { background: var(--be-yellow); color: var(--be-black); }
+    .step.done { color: #27ae60; }
+    .step.done .dot { background: #27ae60; color: #fff; }
+
+    /* ── Results ── */
+    #results-section { display: none; }
+    .warn-banner { background: #FFF3CD; border-left: 4px solid #e6a817; border-radius: 8px; padding: 13px 18px; margin-bottom: 18px; font-size: .86rem; color: #7d5a00; }
+
+    /* ── Carte grise card ── */
+    .cg-card {
+      background: linear-gradient(135deg, #C8C8C8 0%, #D8D8D8 60%, #BEBEBE 100%);
+      border-radius: var(--radius);
+      padding: 26px 30px;
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+    .cg-card::before { content: 'CERTIFICAT D\'IMMATRICULATION · INSCHRIJVINGSBEWIJS · KRAFTFAHRZEUGSCHEIN'; position: absolute; top: 10px; right: 16px; font-size: .5rem; color: rgba(0,0,0,.3); letter-spacing: 1.2px; text-transform: uppercase; font-weight: 700; }
+    .cg-top { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 14px; margin-bottom: 20px; }
+    .cg-identity { flex: 1; min-width: 160px; }
+    .cg-brand { font-size: 2rem; font-weight: 900; color: #111; letter-spacing: -1px; line-height: 1; }
+    .cg-model { font-size: 1rem; color: #444; margin-top: 4px; }
+    .cg-year  { font-size: .78rem; color: #666; margin-top: 3px; }
+
+    /* Belgian plate */
+    .plate { display: inline-flex; align-items: stretch; border: 2px solid #888; border-radius: 7px; overflow: hidden; height: 52px; box-shadow: 0 2px 8px rgba(0,0,0,.2); flex-shrink: 0; }
+    .plate-eu { background: var(--eu-blue); width: 32px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px 4px; gap: 1px; }
+    .plate-stars { color: var(--eu-gold); font-size: .36rem; line-height: 1.4; text-align: center; }
+    .plate-country { color: #fff; font-size: .7rem; font-weight: 900; }
+    .plate-number { background: #fff; color: #111; font-size: 1.5rem; font-weight: 900; letter-spacing: 2.5px; padding: 0 16px; display: flex; align-items: center; min-width: 148px; justify-content: center; }
+    .plate-null .plate-number { color: #bbb; font-style: italic; font-size: .95rem; letter-spacing: 0; }
+
+    /* VIN bar */
+    .vin-bar { background: rgba(0,0,0,.12); border-radius: 8px; padding: 10px 14px; font-family: 'Courier New', monospace; font-size: .95rem; letter-spacing: 2px; color: #222; display: flex; align-items: center; gap: 10px; margin-bottom: 18px; word-break: break-all; }
+    .vin-bar .lbl { font-family: 'Segoe UI', sans-serif; font-size: .62rem; text-transform: uppercase; letter-spacing: .5px; font-weight: 800; color: #555; flex-shrink: 0; }
+
+    /* Specs */
+    .specs { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 9px; }
+    .spec { background: rgba(255,255,255,.55); border-radius: 8px; padding: 10px 13px; }
+    .spec-lbl { font-size: .62rem; text-transform: uppercase; letter-spacing: .5px; font-weight: 700; color: #666; margin-bottom: 4px; }
+    .spec-val { font-size: .95rem; font-weight: 800; color: #111; }
+
+    /* Euro badge */
+    .euro-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: .8rem; font-weight: 800; color: #fff; }
+    .euro-6d  { background: #16b848; } .euro-6  { background: #1a9e4a; }
+    .euro-5   { background: #5cb85c; } .euro-4  { background: #f0ad4e; }
+    .euro-3   { background: #e67e22; } .euro-old{ background: #e74c3c; }
+    .cat-pill { display: inline-block; padding: 2px 8px; background: rgba(0,0,0,.12); border-radius: 4px; font-size: .76rem; font-weight: 700; }
+
+    /* ── Data table ── */
+    .table-card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; margin-bottom: 18px; }
+    .table-head { background: var(--be-black); color: #fff; padding: 15px 22px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .table-head h2 { font-size: .82rem; letter-spacing: 1.2px; text-transform: uppercase; }
+    .conf-badge { padding: 4px 14px; border-radius: 20px; font-size: .76rem; font-weight: 700; }
+    .conf-high { background: #1a9e4a; color: #fff; }
+    .conf-low  { background: #e6a817; color: #fff; }
+    .conf-failed  { background: var(--be-red); color: #fff; }
+    .conf-unknown { background: #888; color: #fff; }
+
+    table { width: 100%; border-collapse: collapse; }
+    thead th { background: #F8F8FA; padding: 9px 18px; text-align: left; font-size: .7rem; text-transform: uppercase; letter-spacing: .5px; color: #999; font-weight: 700; border-bottom: 1px solid #eee; }
+    tbody td { padding: 12px 18px; border-bottom: 1px solid #F3F3F5; vertical-align: middle; }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover td { background: #FAFAFA; }
+    .code-chip { font-family: 'Courier New', monospace; font-size: .75rem; font-weight: 700; background: #F0F0F3; color: #444; padding: 2px 7px; border-radius: 4px; white-space: nowrap; }
+    .td-name { color: #444; font-size: .86rem; }
+    .td-val  { color: #111; font-weight: 700; font-size: .92rem; }
+    .td-null { color: #ccc; font-style: italic; font-size: .82rem; font-weight: 400; }
+
+    /* ── Error ── */
+    #error-section { display: none; }
+    .err-card { background: #FEE; border-left: 4px solid var(--be-red); border-radius: 10px; padding: 18px 22px; }
+    .err-card h3 { color: var(--be-red); margin-bottom: 6px; }
+    .err-card p  { font-size: .88rem; color: #555; }
+    .btn-block { display: block; width: 100%; text-align: center; background: #F0F0F3; border: none; padding: 13px; border-radius: 10px; cursor: pointer; font-size: .86rem; color: #555; margin-top: 14px; transition: background .2s; }
+    .btn-block:hover { background: #E2E4EA; }
+
+    footer { text-align: center; padding: 32px 20px; color: #bbb; font-size: .76rem; }
+    footer a { color: #bbb; }
+  </style>
+</head>
+<body>
+
+<!-- ── Setup banner ── -->
+<div class="setup-banner">
+  <span>
+    <strong>HOW TO RUN:</strong>
+    In the project root: <code>python -m http.server 5500</code> → open
+    <code>http://localhost:5500/demo.html</code>
+    &nbsp;(direct file:// may be blocked by the browser)
+  </span>
+  <span class="sep">|</span>
+  <span>
+    <strong>API DOCS (dev mode):</strong>
+    <a class="docs-link" href="http://localhost:8001/docs" target="_blank">MinIO /docs</a>
+    &nbsp;&bull;&nbsp;
+    <a class="docs-link" href="http://localhost:8000/docs" target="_blank">OCR Engine /docs</a>
+    &nbsp;— visible only when <code>APP_ENV=development</code>
+  </span>
+</div>
+
+<div class="flag-bar"></div>
+
+<header>
+  <div class="mini-flag"><div class="mf-b"></div><div class="mf-y"></div><div class="mf-r"></div></div>
+  <div>
+    <h1>Carte Grise OCR &mdash; Demo</h1>
+    <p>Belgian Vehicle Registration Certificate Extractor &nbsp;&bull;&nbsp; PaddleOCR + GPT-4o-mini</p>
+  </div>
+  <div class="header-badge">Hybrid Pipeline v1.0</div>
+</header>
+
+<!-- ── Config panel ── -->
+<div class="config-panel">
+  <div class="config-card">
+    <div class="status-row" id="status-row">
+      <div class="status-item"><div class="dot-status checking" id="dot-minio"></div><span>MinIO Service <small id="lbl-minio">checking&hellip;</small></span></div>
+      <div class="status-item"><div class="dot-status checking" id="dot-ocr"></div><span>OCR Engine <small id="lbl-ocr">checking&hellip;</small></span></div>
+    </div>
+    <button class="config-toggle" id="config-toggle">
+      <strong>&#9881; API Configuration</strong>
+      <span id="toggle-label">show &#9660;</span>
+    </button>
+    <div class="config-body" id="config-body">
+      <div class="config-row">
+        <label>MinIO Storage Service URL</label>
+        <input type="text" id="cfg-minio" value="http://localhost:8001" />
+      </div>
+      <div class="config-row">
+        <label>OCR Engine URL</label>
+        <input type="text" id="cfg-ocr" value="http://localhost:8000" />
+      </div>
+    </div>
+  </div>
+</div>
+
+<main>
+
+  <!-- ── Upload ── -->
+  <div id="upload-section" class="card" style="padding:0; margin-top:20px;">
+    <div id="upload-zone">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+      <h2>Drop a Carte Grise image here</h2>
+      <p>or click to browse &nbsp;&bull;&nbsp; JPEG &middot; PNG &middot; PDF &nbsp;&bull;&nbsp; max 10 MB</p>
+      <input type="file" id="file-input" accept="image/jpeg,image/png,application/pdf" />
+    </div>
+  </div>
+
+  <!-- ── Preview ── -->
+  <div id="preview-section" class="card" style="margin-top:20px;">
+    <div class="inner">
+      <img id="preview-img" src="" alt="Selected document" />
+      <div class="btn-row">
+        <button class="btn btn-primary" id="process-btn">&#128269; Extract Data</button>
+        <button class="btn btn-ghost"   id="reset-btn-preview">&#215; Change Image</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Loading ── -->
+  <div id="loading-section" class="card" style="margin-top:20px;">
+    <div class="spinner"></div>
+    <div class="steps">
+      <div class="step" id="s-upload">   <div class="dot">1</div><span>Uploading image to MinIO storage&hellip;</span></div>
+      <div class="step" id="s-preprocess"><div class="dot">2</div><span>Preprocessing &amp; deskewing&hellip;</span></div>
+      <div class="step" id="s-ocr">     <div class="dot">3</div><span>Extracting raw text with PaddleOCR&hellip;</span></div>
+      <div class="step" id="s-llm">     <div class="dot">4</div><span>Structuring fields with GPT-4o-mini&hellip;</span></div>
+    </div>
+  </div>
+
+  <!-- ── Results ── -->
+  <div id="results-section" style="margin-top:20px;">
+    <div id="warn-bar" class="warn-banner" style="display:none;">
+      &#9888;&#65039; <strong>Low confidence</strong> — one or more core fields (plate, VIN, brand, engine) were unclear.
+      Check the table for missing values.
+    </div>
+    <div class="cg-card" id="cg-card"></div>
+    <div class="table-card">
+      <div class="table-head">
+        <h2>Extracted Fields &mdash; EU Codes A &rarr; V.9</h2>
+        <span class="conf-badge" id="conf-badge"></span>
+      </div>
+      <table>
+        <thead><tr>
+          <th style="width:68px;">Code</th>
+          <th style="width:220px;">Field</th>
+          <th>Value</th>
+          <th style="width:190px;">Description</th>
+        </tr></thead>
+        <tbody id="tbl-body"></tbody>
+      </table>
+    </div>
+    <button class="btn-block" id="reset-btn-results">&#8617; Analyse another document</button>
+  </div>
+
+  <!-- ── Error ── -->
+  <div id="error-section" style="margin-top:20px;">
+    <div class="err-card">
+      <h3>Extraction failed</h3>
+      <p id="err-msg"></p>
+    </div>
+    <button class="btn-block" id="reset-btn-error">&#8617; Try again</button>
+  </div>
+
+</main>
+
+<footer>
+  Powered by PaddleOCR &bull; GPT-4o-mini &bull; FastAPI &bull; MinIO &mdash;
+  <a href="http://localhost:8001/docs" target="_blank">MinIO Swagger</a> &middot;
+  <a href="http://localhost:8000/docs" target="_blank">OCR Swagger</a>
+  (dev mode only)
+</footer>
+
+<script>
+/* ── Field definitions ── */
+const FIELDS = [
+  { key:'license_plate',           code:'A',     name:'License Plate',              desc:'Registration plate number' },
+  { key:'first_registration_date', code:'B',     name:'First Registration Date',    desc:'Date of first circulation (YYYY-MM-DD)' },
+  { key:'vin',                     code:'E',     name:'VIN / Chassis Number',       desc:'17-char Vehicle Identification Number' },
+  { key:'owner_name',              code:'C.1',   name:'Owner Name',                 desc:'Name & surname of titular owner' },
+  { key:'registration_address',    code:'C.3',   name:'Registration Address',       desc:'Official mail address of the vehicle' },
+  { key:'brand',                   code:'D.1',   name:'Brand / Make',               desc:'Manufacturer (e.g. Peugeot, BMW)' },
+  { key:'type_variant_version',    code:'D.2',   name:'Type / Variant / Version',   desc:'Internal type code' },
+  { key:'cnit_code',               code:'D.2.1', name:'CNIT Code',                  desc:'National Type Identification Code' },
+  { key:'commercial_name',         code:'D.3',   name:'Commercial Model Name',      desc:'Market name (e.g. Clio, 308, Golf)' },
+  { key:'gross_vehicle_weight_kg', code:'F.1',   name:'Gross Vehicle Weight',       desc:'MMA / GVW in kg' },
+  { key:'adjusted_gvw_kg',         code:'F.2',   name:'Adjusted GVW',               desc:'Adjusted gross vehicle weight in kg' },
+  { key:'max_towing_weight_kg',    code:'F.3',   name:'Max Towing Weight (GCWR)',   desc:'Gross Combination Weight Rating in kg' },
+  { key:'max_trailer_weight_kg',   code:'O.1',   name:'Max Trailer Weight',         desc:'Maximum permitted trailer weight in kg' },
+  { key:'eu_category',             code:'J.1',   name:'EU Vehicle Category',        desc:'M1=car, N1=light van, L3e=moto…' },
+  { key:'eu_bodywork_code',        code:'J.2',   name:'EU Bodywork Code',           desc:'AA=sedan, AB=hatchback, AG=SUV…' },
+  { key:'national_bodywork',       code:'J.3',   name:'National Bodywork',          desc:'National bodywork designation string' },
+  { key:'type_approval_number',    code:'K',     name:'Type Approval Number',       desc:'e.g. e2*2007/46*0123' },
+  { key:'engine_capacity_cm3',     code:'P.1',   name:'Engine Capacity (cm³)',      desc:'Displacement in cubic centimetres' },
+  { key:'max_power_kw',            code:'P.2',   name:'Max Power (kW)',             desc:'Maximum net power output' },
+  { key:'fuel_type',               code:'P.3',   name:'Fuel / Energy Type',         desc:'Diesel, Petrol, Electric, Hybrid…' },
+  { key:'fiscal_power_cv',         code:'P.6',   name:'Fiscal Power (CV)',          desc:'Administrative horsepower (chevaux fiscaux)' },
+  { key:'seating_capacity',        code:'S.1',   name:'Seating Capacity',           desc:'Total seats including driver' },
+  { key:'standing_places',         code:'S.2',   name:'Standing Places',            desc:'Standing positions (0 for private cars)' },
+  { key:'co2_emissions_g_km',      code:'V.7',   name:'CO₂ Emissions (g/km)',       desc:'Carbon dioxide emissions in g/km' },
+  { key:'euro_class',              code:'V.9',   name:'Euro Emission Standard',     desc:'e.g. Euro 5, Euro 6d, Euro 6d-temp' },
+];
+
+const EU_CATEGORIES = { M1:'Passenger car (≤8 seats)', M2:'Minibus', M3:'Bus', N1:'Light commercial (≤3.5t)', N2:'Medium truck', N3:'Heavy truck', L3e:'Motorcycle' };
+const EU_BODYWORKS  = { AA:'Sedan/Berline', AB:'Hatchback', AC:'Break/Wagon', AD:'Coupé', AE:'Convertible', AF:'MPV', AG:'SUV/Off-road', BE:'Pick-up', SH:'Wheelchair' };
+const FUEL_ICONS    = { diesel:'🛢️', gasoil:'🛢️', essence:'⛽', petrol:'⛽', gasoline:'⛽', electric:'⚡', electrique:'⚡', hybrid:'🔋', hybride:'🔋' };
+
+function fuelIcon(f) {
+  if (!f) return '';
+  const k = f.toLowerCase();
+  for (const [kw,ico] of Object.entries(FUEL_ICONS)) if (k.includes(kw)) return ico + ' ';
+  return '';
+}
+function euroClass(e) {
+  if (!e) return '';
+  const l = e.toLowerCase();
+  if (l.includes('6d')) return 'euro-6d';
+  if (l.includes('6'))  return 'euro-6';
+  if (l.includes('5'))  return 'euro-5';
+  if (l.includes('4'))  return 'euro-4';
+  if (l.includes('3'))  return 'euro-3';
+  return 'euro-old';
+}
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+/* ── Config ── */
+const cfgMinio = () => document.getElementById('cfg-minio').value.replace(/\/$/, '');
+const cfgOcr   = () => document.getElementById('cfg-ocr').value.replace(/\/$/, '');
+
+document.getElementById('config-toggle').addEventListener('click', () => {
+  const body = document.getElementById('config-body');
+  const lbl  = document.getElementById('toggle-label');
+  body.classList.toggle('open');
+  lbl.textContent = body.classList.contains('open') ? 'hide ▲' : 'show ▼';
+});
+
+/* ── Health checks ── */
+async function checkHealth() {
+  const check = async (url, dotId, lblId) => {
+    const dot = document.getElementById(dotId);
+    const lbl = document.getElementById(lblId);
+    try {
+      const r = await fetch(url + '/health', { signal: AbortSignal.timeout(3000) });
+      if (r.ok) { dot.className = 'dot-status up'; lbl.textContent = 'online'; }
+      else       { dot.className = 'dot-status down'; lbl.textContent = 'error ' + r.status; }
+    } catch { dot.className = 'dot-status down'; lbl.textContent = 'offline'; }
+  };
+  await Promise.all([check(cfgMinio(), 'dot-minio', 'lbl-minio'), check(cfgOcr(), 'dot-ocr', 'lbl-ocr')]);
+}
+checkHealth();
+setInterval(checkHealth, 30000);
+
+/* ── Sections ── */
+const SECTIONS = ['upload','preview','loading','results','error'];
+function show(name) {
+  SECTIONS.forEach(s => {
+    const el = document.getElementById(s + '-section');
+    if (el) el.style.display = s === name ? 'block' : 'none';
+  });
+}
+
+/* ── Upload / drag-drop ── */
+let currentFile = null;
+const dropZone  = document.getElementById('upload-zone');
+const fileInput = document.getElementById('file-input');
+
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag-over'); handleFile(e.dataTransfer.files[0]); });
+fileInput.addEventListener('change', () => handleFile(fileInput.files[0]));
+
+function handleFile(file) {
+  if (!file) return;
+  if (!['image/jpeg','image/png','application/pdf'].includes(file.type)) {
+    showErr('Unsupported file type. Please upload JPEG, PNG, or PDF.'); return;
+  }
+  currentFile = file;
+  show('preview');
+  if (file.type !== 'application/pdf') {
+    const r = new FileReader();
+    r.onload = e => document.getElementById('preview-img').src = e.target.result;
+    r.readAsDataURL(file);
+  } else {
+    document.getElementById('preview-img').src = '';
+    document.getElementById('preview-img').alt = '📄 ' + file.name;
+  }
+}
+
+/* ── Steps ── */
+function setStep(id, state) {
+  const el = document.getElementById(id);
+  el.className = 'step ' + state;
+  if (state === 'done')   el.querySelector('.dot').textContent = '✓';
+  if (state === 'active') el.querySelector('.dot').textContent = el.querySelector('.dot').dataset.n || '●';
+}
+function resetSteps() {
+  [['s-upload','1'],['s-preprocess','2'],['s-ocr','3'],['s-llm','4']].forEach(([id,n]) => {
+    const el = document.getElementById(id);
+    el.className = 'step';
+    const dot = el.querySelector('.dot');
+    dot.textContent = n;
+    dot.dataset.n = n;
+  });
+}
+
+/* ── Pipeline ── */
+document.getElementById('process-btn').addEventListener('click', runPipeline);
+
+async function runPipeline() {
+  if (!currentFile) return;
+  resetSteps();
+  show('loading');
+
+  try {
+    setStep('s-upload', 'active');
+    const fd = new FormData();
+    fd.append('file', currentFile);
+    // Upload directly to MinIO service
+    const upRes = await fetch(`${cfgMinio()}/upload`, { method: 'POST', body: fd });
+    if (!upRes.ok) throw new Error(`Upload failed (${upRes.status}): ${await upRes.text()}`);
+    const { file_uuid } = await upRes.json();
+    setStep('s-upload', 'done');
+
+    setStep('s-preprocess', 'active');
+    await new Promise(r => setTimeout(r, 400));
+    setStep('s-preprocess', 'done');
+
+    setStep('s-ocr', 'active');
+    const procRes = await fetch(`${cfgOcr()}/process/${file_uuid}`, { method: 'POST' });
+    setStep('s-ocr', 'done');
+
+    setStep('s-llm', 'active');
+    if (!procRes.ok) throw new Error(`Processing failed (${procRes.status}): ${await procRes.text()}`);
+    const data = await procRes.json();
+    setStep('s-llm', 'done');
+
+    renderResults(data);
+  } catch (err) {
+    showErr(err.message);
+  }
+}
+
+/* ── Render ── */
+function renderResults(d) {
+  renderCard(d);
+  renderTable(d);
+  renderConf(d.confidence);
+  document.getElementById('warn-bar').style.display =
+    (d.confidence === 'low' || d.confidence === 'failed') ? '' : 'none';
+  show('results');
+}
+
+function renderCard(d) {
+  const brand  = d.brand || '';
+  const model  = d.commercial_name || '';
+  const year   = d.first_registration_date ? d.first_registration_date.slice(0,4) : '';
+  const plate  = d.license_plate;
+  const vin    = d.vin;
+
+  const specs = [
+    d.engine_capacity_cm3 && { lbl:'Engine',      val:`${d.engine_capacity_cm3.toLocaleString()} cm³` },
+    d.max_power_kw        && { lbl:'Power',        val:`${d.max_power_kw} kW` },
+    d.fuel_type           && { lbl:'Fuel',         val:`${fuelIcon(d.fuel_type)}${esc(d.fuel_type)}` },
+    d.fiscal_power_cv     && { lbl:'Fiscal HP',    val:`${d.fiscal_power_cv} CV` },
+    d.euro_class          && { lbl:'Emission',     val:`<span class="euro-badge ${euroClass(d.euro_class)}">${esc(d.euro_class)}</span>` },
+    d.co2_emissions_g_km  && { lbl:'CO₂',         val:`${d.co2_emissions_g_km} g/km` },
+    d.seating_capacity    && { lbl:'Seats',        val:`${d.seating_capacity}` },
+    d.gross_vehicle_weight_kg && { lbl:'GVW',      val:`${d.gross_vehicle_weight_kg.toLocaleString()} kg` },
+    d.max_towing_weight_kg    && { lbl:'Max Tow',  val:`${d.max_towing_weight_kg.toLocaleString()} kg` },
+    d.eu_category && { lbl:'Category', val:`<span class="cat-pill">${esc(d.eu_category)}</span> <small style="color:#555;font-size:.7rem">${esc(EU_CATEGORIES[d.eu_category]||'')}</small>` },
+    d.eu_bodywork_code && { lbl:'Bodywork', val:`<span class="cat-pill">${esc(d.eu_bodywork_code)}</span> <small style="color:#555;font-size:.7rem">${esc(EU_BODYWORKS[d.eu_bodywork_code]||'')}</small>` },
+  ].filter(Boolean);
+
+  document.getElementById('cg-card').innerHTML = `
+    <div class="cg-top">
+      <div class="cg-identity">
+        <div class="cg-brand">${brand ? esc(brand) : '<span style="color:#888;font-weight:400;font-size:1.2rem">Unknown Brand</span>'}</div>
+        ${model ? `<div class="cg-model">${esc(model)}</div>` : ''}
+        ${year  ? `<div class="cg-year">First registered: ${esc(year)}</div>` : ''}
+      </div>
+      <div class="${plate ? 'plate' : 'plate plate-null'}">
+        <div class="plate-eu">
+          <div class="plate-stars">★★★<br>★ ★<br>★ ★<br>★★★</div>
+          <div class="plate-country">B</div>
+        </div>
+        <div class="plate-number">${plate ? esc(plate) : 'Not found'}</div>
+      </div>
+    </div>
+    ${vin ? `<div class="vin-bar"><span class="lbl">VIN</span><span>${esc(vin)}</span></div>` : ''}
+    ${specs.length
+      ? `<div class="specs">${specs.map(s=>`<div class="spec"><div class="spec-lbl">${s.lbl}</div><div class="spec-val">${s.val}</div></div>`).join('')}</div>`
+      : '<p style="color:#888;font-size:.83rem;margin-top:8px">No vehicle specs could be extracted.</p>'}
+  `;
+}
+
+function renderTable(d) {
+  const body = document.getElementById('tbl-body');
+  body.innerHTML = '';
+  for (const f of FIELDS) {
+    const v = d[f.key];
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><span class="code-chip">${f.code}</span></td>
+      <td class="td-name">${f.name}</td>
+      <td>${v != null ? `<span class="td-val">${esc(String(v))}</span>` : '<span class="td-null">— not found</span>'}</td>
+      <td style="color:#bbb;font-size:.76rem;">${f.desc}</td>
+    `;
+    body.appendChild(tr);
+  }
+}
+
+function renderConf(conf) {
+  const badge = document.getElementById('conf-badge');
+  const labels = { high:'✓ High confidence', low:'⚠ Low confidence', failed:'✗ Failed' };
+  badge.textContent = labels[conf] || 'Unknown';
+  badge.className = `conf-badge conf-${conf||'unknown'}`;
+}
+
+/* ── Reset / Error ── */
+function showErr(msg) { document.getElementById('err-msg').textContent = msg; show('error'); }
+function resetUI() { currentFile = null; fileInput.value = ''; document.getElementById('preview-img').src = ''; resetSteps(); show('upload'); }
+document.getElementById('reset-btn-preview').addEventListener('click', resetUI);
+document.getElementById('reset-btn-results').addEventListener('click', resetUI);
+document.getElementById('reset-btn-error').addEventListener('click', resetUI);
+</script>
+</body>
+</html>
